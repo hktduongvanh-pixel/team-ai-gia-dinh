@@ -1,7 +1,8 @@
-# Team AI Gia Đình - High Contrast Dark UI
+# Team AI Gia Đình - Light Theme (nền trắng chữ đen)
 import streamlit as st
 import requests
 from urllib.parse import quote
+import io
 
 st.set_page_config(
     page_title="Team AI Gia Đình",
@@ -10,15 +11,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ==================== HIGH CONTRAST CSS ====================
+# ==================== LIGHT THEME CSS ====================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     * { font-family: 'Inter', system-ui, sans-serif; }
 
     .stApp {
-        background: #0d0d12;
-        color: #f0f0f0;
+        background: #ffffff;
+        color: #1a1a1a;
     }
 
     .main .block-container {
@@ -27,69 +28,61 @@ st.markdown("""
         max-width: 820px;
     }
 
-    /* Tiêu đề rõ ràng */
     h1 {
-        font-size: 2rem;
+        font-size: 1.9rem;
         font-weight: 700;
-        color: #ffffff !important;
+        color: #111111 !important;
         margin-bottom: 0.3rem;
     }
 
-    /* Caption dễ đọc */
-    .stCaption, .stMarkdown p, .stMarkdown li {
-        color: #d0d0d0 !important;
+    .stCaption, .stMarkdown p, .stMarkdown li, .stMarkdown {
+        color: #222222 !important;
     }
 
-    /* Chat bubble contrast cao */
+    /* Chat bubble */
     .stChatMessage {
-        background: #1c1c24;
-        border: 1px solid #3a3a48;
+        background: #f7f7f8;
+        border: 1px solid #e0e0e0;
         border-radius: 14px;
         padding: 14px 16px;
         margin-bottom: 10px;
-        color: #f5f5f5;
+        color: #1a1a1a;
     }
 
-    /* Ô chat input rõ */
+    /* Chat input */
     .stChatInput > div {
-        background: #1c1c24 !important;
-        border: 1px solid #4a4a58 !important;
+        background: #ffffff !important;
+        border: 1px solid #cccccc !important;
         border-radius: 22px !important;
-        color: #ffffff !important;
     }
     .stChatInput input {
-        color: #ffffff !important;
+        color: #111111 !important;
     }
 
-    /* File uploader rõ ràng hơn */
+    /* File uploader */
     .stFileUploader {
-        background: #1c1c24;
-        border: 2px dashed #5a5a70;
+        background: #f9f9f9;
+        border: 2px dashed #bbbbbb;
         border-radius: 14px;
         padding: 14px;
     }
     .stFileUploader label, .stFileUploader span {
-        color: #e0e0e0 !important;
+        color: #333333 !important;
         font-weight: 500;
     }
-    .stFileUploader button {
-        background: #4f46e5 !important;
-        color: white !important;
-        border: none !important;
-    }
 
-    /* Status dễ nhìn */
+    /* Status */
     .status-working {
-        background: #4a2c2c;
-        color: #ffb3b3;
+        background: #fff3cd;
+        color: #856404;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.82rem;
         font-weight: 600;
     }
     .status-done {
-        background: #1e3d2f;
-        color: #8dffc0;
+        background: #d4edda;
+        color: #155724;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.82rem;
@@ -98,29 +91,28 @@ st.markdown("""
 
     /* Sidebar */
     section[data-testid="stSidebar"] {
-        background: #111118;
-        border-right: 1px solid #2a2a35;
+        background: #f8f9fa;
+        border-right: 1px solid #e0e0e0;
     }
     section[data-testid="stSidebar"] * {
-        color: #e8e8e8 !important;
+        color: #1a1a1a !important;
     }
 
-    /* Nút */
+    /* Button */
     .stButton > button {
-        background: #ef4444;
+        background: #dc3545;
         color: white;
         border: none;
         border-radius: 12px;
         font-weight: 600;
     }
     .stButton > button:hover {
-        background: #dc2626;
+        background: #c82333;
     }
 
-    /* Expander */
     .streamlit-expanderHeader {
-        color: #ffffff !important;
-        background: #1c1c24;
+        color: #111111 !important;
+        background: #f7f7f8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -171,14 +163,41 @@ def call_openrouter(messages, model, api_key, temperature=0.7, max_tokens=2000):
         return f"Lỗi gọi API: {str(e)}", {}
 
 def extract_file_content(uploaded_file):
+    """Đọc nội dung file, hỗ trợ text + cố gắng đọc docx"""
     try:
         name = uploaded_file.name.lower()
-        if uploaded_file.type.startswith("text/") or name.endswith((".txt", ".md", ".py", ".csv", ".json", ".html", ".js", ".css", ".xml", ".log")):
-            return uploaded_file.getvalue().decode("utf-8", errors="ignore")
-        elif uploaded_file.type.startswith("image/"):
+        data = uploaded_file.getvalue()
+
+        # Text files
+        if uploaded_file.type.startswith("text/") or name.endswith((".txt", ".md", ".py", ".csv", ".json", ".html", ".js", ".css", ".xml", ".log", ".rtf")):
+            return data.decode("utf-8", errors="ignore")
+
+        # DOCX (basic extraction without extra library)
+        if name.endswith(".docx"):
+            try:
+                import zipfile
+                with zipfile.ZipFile(io.BytesIO(data)) as z:
+                    if "word/document.xml" in z.namelist():
+                        xml_content = z.read("word/document.xml").decode("utf-8", errors="ignore")
+                        # Simple strip tags
+                        import re
+                        text = re.sub(r'<[^>]+>', ' ', xml_content)
+                        text = re.sub(r'\s+', ' ', text).strip()
+                        return text[:5000] if text else "[DOCX: không trích xuất được text]"
+            except:
+                pass
+            return f"[File DOCX: {uploaded_file.name} - cần xử lý thêm]"
+
+        # DOC (old format) - không đọc được dễ dàng
+        if name.endswith(".doc"):
+            return f"[File .doc cũ: {uploaded_file.name} - vui lòng chuyển sang .docx hoặc .txt để đọc tốt hơn]"
+
+        # Image
+        if uploaded_file.type.startswith("image/"):
             return f"[Hình ảnh: {uploaded_file.name}]"
-        else:
-            return f"[File: {uploaded_file.name} ({uploaded_file.type})]"
+
+        # PDF hoặc khác
+        return f"[File: {uploaded_file.name} ({uploaded_file.type or 'unknown'})]"
     except Exception as e:
         return f"[Không đọc được {uploaded_file.name}: {str(e)}]"
 
@@ -212,11 +231,10 @@ with st.sidebar:
 st.markdown("# 👨‍👩‍👧‍👦 Team AI Gia Đình")
 st.caption("Chat • Upload file • Tạo ảnh thật")
 
-# File uploader - chấp nhận nhiều loại hơn
 uploaded_files = st.file_uploader(
     "📎 Gửi file (kéo thả hoặc bấm Upload)",
     accept_multiple_files=True,
-    type=None  # cho phép mọi loại file
+    type=None
 )
 
 file_context = ""
@@ -224,7 +242,7 @@ if uploaded_files:
     with st.expander(f"✅ Đã nhận {len(uploaded_files)} file", expanded=True):
         for f in uploaded_files:
             st.write(f"**{f.name}** — {f.type or 'unknown'}")
-            file_context += f"\n\n--- {f.name} ---\n{extract_file_content(f)[:2000]}"
+            file_context += f"\n\n--- {f.name} ---\n{extract_file_content(f)[:3000]}"
 
 # Lịch sử chat
 for msg in st.session_state.messages:

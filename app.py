@@ -1,22 +1,96 @@
-# Multi-Agent AI Team - Gia đình lớn (Phone Edition)
-# Chạy 100% trên điện thoại qua Replit Mobile App + OpenRouter free models
-# Inspired by @ezvibecode EverMind Team AI demo
+# Team AI Gia Đình Lớn - Premium Edition
+# Chat UI chuyên nghiệp + Upload mọi loại file + Trạng thái agent realtime
 
 import streamlit as st
 import requests
 import json
 import os
 from datetime import datetime
+import base64
 
-# ==================== CONFIG ====================
 st.set_page_config(
-    page_title="Team AI Gia Đình",
+    page_title="Team AI Gia Đình • Premium",
     page_icon="👨‍👩‍👧‍👦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# OpenRouter free models (Nov 2026)
+# ==================== PREMIUM CSS ====================
+st.markdown("""
+<style>
+    /* Premium Dark Theme */
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        color: #e0e0e0;
+    }
+    .main .block-container {
+        padding-top: 1.5rem;
+        max-width: 1100px;
+    }
+    
+    /* Chat bubbles */
+    .stChatMessage {
+        background: rgba(255,255,255,0.05);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        margin-bottom: 12px;
+    }
+    .stChatMessage[data-testid="stChatMessage"] {
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    
+    /* Status badges */
+    .status-working {
+        background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        animation: pulse 1.5s infinite;
+    }
+    .status-done {
+        background: linear-gradient(90deg, #00b894, #00cec9);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+    }
+    
+    /* Premium buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.6rem 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    /* Header */
+    h1 {
+        background: linear-gradient(90deg, #a29bfe, #fd79a8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==================== MODELS & PROMPTS ====================
 FREE_MODELS = {
     "Nemotron 3 Ultra (mạnh nhất)": "nvidia/nemotron-3-ultra-550b-a55b:free",
     "Gemma 4 31B": "google/gemma-4-31b-it:free",
@@ -28,55 +102,52 @@ FREE_MODELS = {
     "Free Router (random free)": "openrouter/free",
 }
 
-# ==================== ROLE PROMPTS ====================
 ROLE_PROMPTS = {
-    "planner": """Bạn là Planner / Điều phối trưởng (Project Manager) của Team AI Gia đình.
-Nhiệm vụ: Phân tích yêu cầu người dùng, chia thành các task cụ thể, giao việc rõ ràng cho từng thành viên.
-Luôn ưu tiên ràng buộc (thời gian, nguồn lực, mục tiêu).
-Output dạng markdown rõ ràng:
+    "planner": """Bạn là Planner / Điều phối trưởng của Team AI Gia đình Premium.
+Phân tích yêu cầu + file đính kèm (nếu có), chia task rõ ràng cho từng agent.
+Output markdown:
 - Các task chính
-- Giao cho vai nào (Coder / Writer / Researcher / Designer / Analyst...)
-- Thứ tự / song song
+- Giao cho vai nào
+- Thứ tự thực hiện
 - Ghi chú quan trọng""",
 
-    "coder": """Bạn là Coder Agent.
-Chuyên viết code, kiến trúc, giải thích thuật toán.
-Viết code sạch, có comment, ưu tiên Python hoặc HTML/JS đơn giản nếu phù hợp.
-Nếu là web app, ưu tiên Streamlit hoặc single HTML.""",
+    "coder": """Bạn là Coder Agent Premium.
+Viết code sạch, có comment, ưu tiên Python/Streamlit/HTML nếu phù hợp.""",
 
-    "writer": """Bạn là Writer Agent.
-Viết nội dung rõ ràng, mạch lạc, đúng yêu cầu.
-Ưu tiên ngắn gọn, có cấu trúc, dễ đọc.""",
+    "writer": """Bạn là Writer Agent Premium.
+Viết nội dung mạch lạc, chuyên nghiệp, đúng yêu cầu.""",
 
-    "researcher": """Bạn là Research Agent.
-Tìm và tổng hợp thông tin có logic. Nêu rõ nguồn nếu có hoặc phần ước tính.
-Không bịa đặt.""",
+    "researcher": """Bạn là Research Agent Premium.
+Tổng hợp thông tin logic, rõ ràng. Không bịa đặt.""",
 
-    "designer": """Bạn là Designer / Image Agent.
-Đề xuất ý tưởng giao diện, mô tả hình ảnh, layout, màu sắc, UX.
-Có thể viết prompt cho AI image nếu cần.""",
+    "designer": """Bạn là Designer Agent Premium.
+Đề xuất ý tưởng giao diện, layout, UX, mô tả hình ảnh.""",
 
-    "analyst": """Bạn là Analyst Agent.
-Phân tích số liệu, logic, so sánh, đưa ra insight và khuyến nghị.""",
+    "analyst": """Bạn là Analyst Agent Premium.
+Phân tích, so sánh, đưa insight và khuyến nghị.""",
 
-    "reviewer": """Bạn là Reviewer / Kiểm duyệt nghiêm ngặt.
-Nhiệm vụ bắt buộc:
-1. Kiểm tra toàn bộ kết quả có tuân thủ yêu cầu và ràng buộc không.
-2. Nếu vượt giới hạn (thời gian, nguồn lực) → chỉ rõ và đề xuất cắt / dời.
-3. Kiểm tra logic, thiếu sót, mâu thuẫn.
-4. Tổng hợp thành bản cuối cùng mạch lạc, sẵn sàng dùng.
-5. Nêu rõ phần nào cần sửa nếu có.
-Luôn so với yêu cầu gốc + quy tắc team."""
+    "reviewer": """Bạn là Reviewer Premium.
+Kiểm tra toàn bộ kết quả, sửa lỗi logic, tổng hợp bản cuối cùng hoàn chỉnh và sẵn sàng dùng."""
 }
 
-# ==================== OPENROUTER CLIENT ====================
-def call_openrouter(messages, model, api_key, temperature=0.7, max_tokens=2500):
+AGENT_INFO = {
+    "planner": ("🎯", "Planner", "Đang điều phối & chia việc"),
+    "coder": ("💻", "Coder", "Đang viết code"),
+    "writer": ("✍️", "Writer", "Đang viết nội dung"),
+    "researcher": ("🔍", "Researcher", "Đang nghiên cứu"),
+    "designer": ("🎨", "Designer", "Đang thiết kế"),
+    "analyst": ("📊", "Analyst", "Đang phân tích"),
+    "reviewer": ("✅", "Reviewer", "Đang kiểm duyệt & tổng hợp"),
+}
+
+# ==================== API ====================
+def call_openrouter(messages, model, api_key, temperature=0.7, max_tokens=2000):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://team-ai-family.streamlit.app",
-        "X-Title": "Team AI Gia Dinh"
+        "HTTP-Referer": "https://team-ai-gia-dinh.streamlit.app",
+        "X-Title": "Team AI Gia Dinh Premium"
     }
     payload = {
         "model": model,
@@ -94,187 +165,159 @@ def call_openrouter(messages, model, api_key, temperature=0.7, max_tokens=2500):
     except Exception as e:
         return f"Lỗi gọi API: {str(e)}", {}
 
-# ==================== UI ====================
-st.title("👨‍👩‍👧‍👦 Team AI Gia Đình Lớn")
-st.caption("Multi-Agent Team • Tất cả các AI làm việc cùng nhau • Chạy 100% trên điện thoại")
-
-with st.sidebar:
-    st.header("⚙️ Cấu hình")
-    # Ưu tiên secrets (Streamlit Cloud / Replit) rồi mới đến input
-    default_key = ""
+def extract_file_content(uploaded_file):
+    """Trích xuất nội dung text từ file (txt, md, py, csv...)"""
     try:
-        default_key = st.secrets.get("OPENROUTER_API_KEY", os.getenv("OPENROUTER_API_KEY", ""))
-    except Exception:
-        default_key = os.getenv("OPENROUTER_API_KEY", "")
+        if uploaded_file.type.startswith("text/") or uploaded_file.name.endswith((".txt", ".md", ".py", ".csv", ".json", ".html")):
+            return uploaded_file.getvalue().decode("utf-8")
+        elif uploaded_file.type.startswith("image/"):
+            return f"[Hình ảnh: {uploaded_file.name}]"
+        else:
+            return f"[File: {uploaded_file.name} - loại {uploaded_file.type}]"
+    except:
+        return f"[Không đọc được file: {uploaded_file.name}]"
+
+# ==================== SESSION ====================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "agent_status" not in st.session_state:
+    st.session_state.agent_status = {}
+
+# ==================== SIDEBAR ====================
+with st.sidebar:
+    st.markdown("### ⚙️ Cấu hình Premium")
+    try:
+        default_key = st.secrets.get("OPENROUTER_API_KEY", "")
+    except:
+        default_key = ""
     
-    api_key = st.text_input(
-        "OpenRouter API Key",
-        type="password",
-        value=default_key,
-        help="Lấy free key tại openrouter.ai. Trên Streamlit Cloud dùng Secrets."
-    )
-    model_choice = st.selectbox("Model mặc định cho cả team", list(FREE_MODELS.keys()), index=0)
+    api_key = st.text_input("OpenRouter API Key", type="password", value=default_key)
+    model_choice = st.selectbox("Model", list(FREE_MODELS.keys()), index=0)
     selected_model = FREE_MODELS[model_choice]
     
     st.divider()
-    st.subheader("Quy tắc team (Rules)")
-    default_rules = """- Ưu tiên chất lượng và đúng yêu cầu gốc
-- Nếu có giới hạn thời gian / nguồn lực → tuân thủ nghiêm
-- Reviewer phải kiểm tra đầy đủ và tổng hợp bản cuối
-- Các agent có thể làm song song hoặc tuần tự tùy Planner quyết định"""
-    team_rules = st.text_area("Nội quy / ràng buộc", value=default_rules, height=150)
+    st.markdown("### 📜 Quy tắc Team")
+    team_rules = st.text_area("Nội quy", value="Ưu tiên chất lượng • Tuân thủ yêu cầu gốc • Reviewer tổng hợp bản cuối hoàn chỉnh", height=100)
     
-    st.info("Giới hạn free: ~50 request/ngày. Một lần chạy team tốn 3-5 request.")
+    st.info("💡 Free: ~50 request/ngày • Mỗi lần chạy team ≈ 4-5 request")
 
-# Team roster
-st.subheader("🏢 Thành viên Team AI")
-cols = st.columns(4)
-members = [
-    ("🎯 Planner", "Điều phối / Chia việc"),
-    ("💻 Coder", "Viết code / Kiến trúc"),
-    ("✍️ Writer", "Nội dung / Văn bản"),
-    ("🔍 Researcher", "Nghiên cứu / Tổng hợp"),
-    ("🎨 Designer", "Giao diện / Hình ảnh"),
-    ("📊 Analyst", "Phân tích / Insight"),
-    ("✅ Reviewer", "Kiểm duyệt / Tổng hợp"),
-    ("🤖 Tất cả", "Làm việc cùng nhau")
-]
-for i, (name, desc) in enumerate(members):
-    with cols[i % 4]:
-        st.info(f"**{name}**\n{desc}")
+# ==================== MAIN UI ====================
+st.title("👨‍👩‍👧‍👦 Team AI Gia Đình Premium")
+st.caption("Chat chuyên nghiệp • Upload mọi loại file • Xem agent đang làm việc realtime")
 
-# Main
-tab1, tab2 = st.tabs(["🚀 Chạy Team", "📋 Hướng dẫn"])
+# File uploader
+uploaded_files = st.file_uploader(
+    "📎 Gửi file (hỗ trợ: txt, md, py, pdf, jpg, png, csv, json...)",
+    accept_multiple_files=True,
+    type=["txt", "md", "py", "pdf", "jpg", "jpeg", "png", "csv", "json", "html", "docx"]
+)
 
-with tab1:
-    st.subheader("Giao việc cho Team AI Gia đình")
-    user_task = st.text_area(
-        "Yêu cầu / Mục tiêu (bất kỳ)",
-        placeholder="Ví dụ: Lên kế hoạch xây dựng website bán hàng online, viết landing page, thiết kế giao diện, nghiên cứu đối thủ...",
-        height=120
-    )
+file_context = ""
+if uploaded_files:
+    st.success(f"✅ Đã nhận {len(uploaded_files)} file")
+    for f in uploaded_files:
+        content = extract_file_content(f)
+        file_context += f"\n\n--- File: {f.name} ---\n{content[:3000]}"  # giới hạn để tránh quá dài
+
+# Chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"], avatar=msg.get("avatar", "👤")):
+        st.markdown(msg["content"])
+
+# Chat input
+if prompt := st.chat_input("Nhập yêu cầu cho Team AI..."):
+    if not api_key:
+        st.error("Vui lòng nhập OpenRouter API Key ở sidebar!")
+        st.stop()
     
-    col1, col2 = st.columns(2)
-    with col1:
-        run_btn = st.button("▶️ Chạy Team Agent", type="primary", use_container_width=True)
-    with col2:
-        if st.button("🔄 Reset", use_container_width=True):
-            st.rerun()
+    # User message
+    full_prompt = prompt
+    if file_context:
+        full_prompt += f"\n\n**File đính kèm:**{file_context}"
+    
+    st.session_state.messages.append({
+        "role": "user",
+        "content": prompt + (f"\n\n📎 {len(uploaded_files)} file đính kèm" if uploaded_files else ""),
+        "avatar": "👤"
+    })
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(prompt)
+        if uploaded_files:
+            st.caption(f"📎 Đính kèm {len(uploaded_files)} file")
 
-    if run_btn and user_task.strip():
-        if not api_key:
-            st.error("Vui lòng nhập OpenRouter API Key ở sidebar!")
-            st.stop()
+    # ========== RUN TEAM ==========
+    with st.spinner("Team đang khởi động..."):
+        # 1. Planner
+        with st.chat_message("assistant", avatar="🎯"):
+            status_placeholder = st.empty()
+            status_placeholder.markdown('<span class="status-working">⏳ Planner đang điều phối...</span>', unsafe_allow_html=True)
+            
+            planner_msg = [
+                {"role": "system", "content": ROLE_PROMPTS["planner"] + "\n\nQuy tắc:\n" + team_rules},
+                {"role": "user", "content": full_prompt}
+            ]
+            plan, _ = call_openrouter(planner_msg, selected_model, api_key)
+            status_placeholder.markdown('<span class="status-done">✅ Planner đã chia việc</span>', unsafe_allow_html=True)
+            st.markdown(plan)
         
-        logs = []
-        progress = st.progress(0)
-        status = st.empty()
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"**🎯 Planner**\n\n{plan}",
+            "avatar": "🎯"
+        })
+
+        # 2. Workers (chọn 2-3 agent chính)
+        workers = ["coder", "writer", "researcher"]
+        worker_results = {}
         
-        # Visual workflow
-        st.markdown("### 🔄 Luồng làm việc")
-        flow_cols = st.columns(3)
-        with flow_cols[0]:
-            st.success("**01. Giao việc**\nPlanner chia task")
-        with flow_cols[1]:
-            st.info("**02. Xử lý**\nWorkers thực hiện")
-        with flow_cols[2]:
-            st.warning("**03. Kết quả**\nReviewer kiểm duyệt")
+        for agent_key in workers:
+            emoji, name, status_text = AGENT_INFO[agent_key]
+            with st.chat_message("assistant", avatar=emoji):
+                status_placeholder = st.empty()
+                status_placeholder.markdown(f'<span class="status-working">⏳ {name} {status_text}...</span>', unsafe_allow_html=True)
+                
+                worker_msg = [
+                    {"role": "system", "content": ROLE_PROMPTS[agent_key]},
+                    {"role": "user", "content": f"Yêu cầu gốc:\n{full_prompt}\n\nKế hoạch từ Planner:\n{plan}\n\nHãy thực hiện phần việc của bạn."}
+                ]
+                result, _ = call_openrouter(worker_msg, selected_model, api_key)
+                worker_results[agent_key] = result
+                
+                status_placeholder.markdown(f'<span class="status-done">✅ {name} đã hoàn thành</span>', unsafe_allow_html=True)
+                st.markdown(result)
+            
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"**{emoji} {name}**\n\n{result}",
+                "avatar": emoji
+            })
+
+        # 3. Reviewer
+        with st.chat_message("assistant", avatar="✅"):
+            status_placeholder = st.empty()
+            status_placeholder.markdown('<span class="status-working">⏳ Reviewer đang kiểm duyệt & tổng hợp...</span>', unsafe_allow_html=True)
+            
+            all_work = "\n\n".join([f"### {AGENT_INFO[k][1]}\n{v}" for k, v in worker_results.items()])
+            reviewer_msg = [
+                {"role": "system", "content": ROLE_PROMPTS["reviewer"]},
+                {"role": "user", "content": f"Yêu cầu gốc:\n{full_prompt}\n\nKế hoạch:\n{plan}\n\nKết quả các agent:\n{all_work}\n\nHãy tổng hợp bản cuối hoàn chỉnh."}
+            ]
+            final, _ = call_openrouter(reviewer_msg, selected_model, api_key)
+            
+            status_placeholder.markdown('<span class="status-done">✅ Reviewer hoàn tất</span>', unsafe_allow_html=True)
+            st.markdown("### 🎯 Bản tổng hợp cuối cùng")
+            st.markdown(final)
         
-        # Step 1: Planner
-        status.info("1️⃣ Planner đang chia việc...")
-        planner_msg = [
-            {"role": "system", "content": ROLE_PROMPTS["planner"] + "\n\nQuy tắc team:\n" + team_rules},
-            {"role": "user", "content": f"Yêu cầu: {user_task}"}
-        ]
-        plan_result, plan_usage = call_openrouter(planner_msg, selected_model, api_key)
-        logs.append(("Planner (Điều phối)", plan_result, plan_usage))
-        progress.progress(20)
-        
-        # Step 2: Workers (Coder + Writer + Researcher as example)
-        status.info("2️⃣ Workers đang thực hiện (Coder + Writer + Researcher)...")
-        worker_system = ROLE_PROMPTS["coder"] + "\n" + ROLE_PROMPTS["writer"] + "\n" + ROLE_PROMPTS["researcher"]
-        worker_msg = [
-            {"role": "system", "content": worker_system},
-            {"role": "user", "content": f"Kế hoạch từ Planner:\n{plan_result}\n\nThực hiện phần việc phù hợp. Quy tắc:\n{team_rules}\nYêu cầu gốc: {user_task}"}
-        ]
-        worker_result, worker_usage = call_openrouter(worker_msg, selected_model, api_key)
-        logs.append(("Workers (Coder/Writer/Researcher)", worker_result, worker_usage))
-        progress.progress(55)
-        
-        # Optional extra worker
-        status.info("2️⃣b Designer đang đóng góp ý tưởng...")
-        designer_msg = [
-            {"role": "system", "content": ROLE_PROMPTS["designer"]},
-            {"role": "user", "content": f"Dựa trên kế hoạch và yêu cầu:\n{user_task}\nKế hoạch:\n{plan_result}\nĐưa ý tưởng thiết kế / giao diện phù hợp."}
-        ]
-        designer_result, designer_usage = call_openrouter(designer_msg, selected_model, api_key)
-        logs.append(("Designer", designer_result, designer_usage))
-        progress.progress(75)
-        
-        # Step 3: Reviewer
-        status.info("3️⃣ Reviewer đang kiểm duyệt và tổng hợp...")
-        reviewer_msg = [
-            {"role": "system", "content": ROLE_PROMPTS["reviewer"]},
-            {"role": "user", "content": f"""Yêu cầu gốc: {user_task}
-Quy tắc: {team_rules}
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"**✅ Reviewer - Bản cuối**\n\n{final}",
+            "avatar": "✅"
+        })
 
-Kế hoạch Planner:
-{plan_result}
+    st.success("Team AI đã hoàn thành yêu cầu!")
+    st.rerun()
 
-Kết quả Workers:
-{worker_result}
-
-Ý tưởng Designer:
-{designer_result}
-
-Hãy kiểm duyệt nghiêm ngặt, đề xuất chỉnh sửa nếu cần, rồi tổng hợp bản cuối cùng hoàn chỉnh."""}
-        ]
-        review_result, review_usage = call_openrouter(reviewer_msg, selected_model, api_key)
-        logs.append(("Reviewer (Kiểm duyệt)", review_result, review_usage))
-        progress.progress(100)
-        status.success("✅ Team hoàn thành!")
-        
-        # Display results
-        st.divider()
-        st.subheader("📊 Kết quả từng bước")
-        
-        for role, content, usage in logs:
-            with st.expander(f"**{role}**", expanded=(role.startswith("Reviewer"))):
-                st.markdown(content)
-                if usage:
-                    st.caption(f"Tokens: in={usage.get('prompt_tokens', '?')} • out={usage.get('completion_tokens', '?')}")
-        
-        st.subheader("🎯 Bản tổng hợp cuối từ Reviewer")
-        st.success(review_result)
-
-with tab2:
-    st.markdown("""
-### Cách build & chạy 100% trên iPhone
-
-1. **Cài app Replit** từ App Store.
-2. Tạo project mới → chọn Python / dùng template Streamlit.
-3. Copy toàn bộ code `app.py` này vào file chính.
-4. Tạo file `requirements.txt` với nội dung:
-   ```
-   streamlit
-   requests
-   ```
-5. Vào **Secrets** → thêm `OPENROUTER_API_KEY` = key của bạn (lấy free tại openrouter.ai).
-6. Chạy app (Run) → Deploy để có link public.
-7. Mở link trên Safari → **Add to Home Screen** → dùng như app PWA full màn hình.
-
-### Models free tốt nhất hiện tại
-- `nvidia/nemotron-3-ultra-550b-a55b:free` — mạnh nhất
-- `google/gemma-4-31b-it:free`
-- `cohere/north-mini-code:free` — tốt cho code
-
-### Giới hạn
-Free tier: khoảng 50 request/ngày (tăng lên 1000 sau khi nạp $10 một lần).
-Một vòng Team tốn 4 request.
-
-### Mở rộng sau này
-Thêm nhiều Worker song song thật sự, lưu history, visual canvas (React Flow), hoặc chuyển sang Flet/Gradio nếu muốn native hơn.
-    """)
-
-st.divider()
-st.caption(f"Team AI Gia Đình • {datetime.now().strftime('%Y-%m-%d')} • Inspired by @ezvibecode EverMind")
+# Clear chat
+if st.sidebar.button("🗑️ Xóa lịch sử chat", use_container_width=True):
+    st.session_state.messages = []
+    st.rerun()

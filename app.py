@@ -1,4 +1,4 @@
-# Team AI Gia Đình - Modern Dark UI
+# Team AI Gia Đình - High Contrast Dark UI
 import streamlit as st
 import requests
 from urllib.parse import quote
@@ -10,101 +10,117 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ==================== MODERN DARK CSS ====================
+# ==================== HIGH CONTRAST CSS ====================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
     * { font-family: 'Inter', system-ui, sans-serif; }
-    
+
     .stApp {
-        background: #0a0a0f;
-        color: #e5e5e5;
+        background: #0d0d12;
+        color: #f0f0f0;
     }
-    
+
     .main .block-container {
-        padding-top: 2rem;
+        padding-top: 1.5rem;
         padding-bottom: 8rem;
-        max-width: 800px;
+        max-width: 820px;
     }
-    
-    /* Header đẹp hơn */
+
+    /* Tiêu đề rõ ràng */
     h1 {
-        font-size: 2.2rem;
+        font-size: 2rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #ffffff 0%, #ff4d4d 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
+        color: #ffffff !important;
+        margin-bottom: 0.3rem;
     }
-    
-    /* Chat bubbles hiện đại */
+
+    /* Caption dễ đọc */
+    .stCaption, .stMarkdown p, .stMarkdown li {
+        color: #d0d0d0 !important;
+    }
+
+    /* Chat bubble contrast cao */
     .stChatMessage {
-        background: #14141a;
-        border: 1px solid #2a2a35;
-        border-radius: 16px;
-        padding: 14px 16px;
-        margin-bottom: 12px;
-    }
-    
-    /* Ô nhập chat */
-    .stChatInput > div {
-        background: #14141a !important;
-        border: 1px solid #2a2a35 !important;
-        border-radius: 20px !important;
-    }
-    
-    /* File uploader đẹp hơn */
-    .stFileUploader {
-        background: #14141a;
-        border: 1px dashed #3a3a4a;
+        background: #1c1c24;
+        border: 1px solid #3a3a48;
         border-radius: 14px;
-        padding: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        color: #f5f5f5;
     }
-    .stFileUploader label {
-        color: #a0a0b0 !important;
+
+    /* Ô chat input rõ */
+    .stChatInput > div {
+        background: #1c1c24 !important;
+        border: 1px solid #4a4a58 !important;
+        border-radius: 22px !important;
+        color: #ffffff !important;
     }
-    
-    /* Status */
+    .stChatInput input {
+        color: #ffffff !important;
+    }
+
+    /* File uploader rõ ràng hơn */
+    .stFileUploader {
+        background: #1c1c24;
+        border: 2px dashed #5a5a70;
+        border-radius: 14px;
+        padding: 14px;
+    }
+    .stFileUploader label, .stFileUploader span {
+        color: #e0e0e0 !important;
+        font-weight: 500;
+    }
+    .stFileUploader button {
+        background: #4f46e5 !important;
+        color: white !important;
+        border: none !important;
+    }
+
+    /* Status dễ nhìn */
     .status-working {
-        background: #3a1f1f;
-        color: #ff8a8a;
+        background: #4a2c2c;
+        color: #ffb3b3;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.82rem;
-        font-weight: 500;
+        font-weight: 600;
     }
     .status-done {
-        background: #1f3a2a;
-        color: #7dffb3;
+        background: #1e3d2f;
+        color: #8dffc0;
         padding: 4px 12px;
         border-radius: 20px;
         font-size: 0.82rem;
-        font-weight: 500;
+        font-weight: 600;
     }
-    
+
     /* Sidebar */
     section[data-testid="stSidebar"] {
-        background: #0f0f14;
-        border-right: 1px solid #22222a;
+        background: #111118;
+        border-right: 1px solid #2a2a35;
     }
-    
+    section[data-testid="stSidebar"] * {
+        color: #e8e8e8 !important;
+    }
+
     /* Nút */
     .stButton > button {
-        background: #ff4d4d;
+        background: #ef4444;
         color: white;
         border: none;
         border-radius: 12px;
         font-weight: 600;
-        padding: 0.5rem 1.2rem;
     }
     .stButton > button:hover {
-        background: #ff3333;
+        background: #dc2626;
     }
-    
-    /* Caption */
-    .stCaption {
-        color: #888 !important;
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        color: #ffffff !important;
+        background: #1c1c24;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -156,14 +172,15 @@ def call_openrouter(messages, model, api_key, temperature=0.7, max_tokens=2000):
 
 def extract_file_content(uploaded_file):
     try:
-        if uploaded_file.type.startswith("text/") or uploaded_file.name.endswith((".txt", ".md", ".py", ".csv", ".json", ".html", ".js")):
-            return uploaded_file.getvalue().decode("utf-8")
+        name = uploaded_file.name.lower()
+        if uploaded_file.type.startswith("text/") or name.endswith((".txt", ".md", ".py", ".csv", ".json", ".html", ".js", ".css", ".xml", ".log")):
+            return uploaded_file.getvalue().decode("utf-8", errors="ignore")
         elif uploaded_file.type.startswith("image/"):
             return f"[Hình ảnh: {uploaded_file.name}]"
         else:
-            return f"[File: {uploaded_file.name}]"
-    except:
-        return f"[Không đọc được: {uploaded_file.name}]"
+            return f"[File: {uploaded_file.name} ({uploaded_file.type})]"
+    except Exception as e:
+        return f"[Không đọc được {uploaded_file.name}: {str(e)}]"
 
 def generate_image(prompt: str):
     clean = quote(prompt.strip()[:500])
@@ -192,22 +209,22 @@ with st.sidebar:
         st.rerun()
 
 # ==================== MAIN ====================
-st.markdown("# 👨‍👩‍👧‍👦 Team AI<br>Gia Đình", unsafe_allow_html=True)
+st.markdown("# 👨‍👩‍👧‍👦 Team AI Gia Đình")
 st.caption("Chat • Upload file • Tạo ảnh thật")
 
-# File uploader
+# File uploader - chấp nhận nhiều loại hơn
 uploaded_files = st.file_uploader(
-    "📎 Gửi file (kéo thả hoặc bấm chọn)",
+    "📎 Gửi file (kéo thả hoặc bấm Upload)",
     accept_multiple_files=True,
-    type=["txt", "md", "py", "pdf", "jpg", "jpeg", "png", "csv", "json", "html", "js", "zip"]
+    type=None  # cho phép mọi loại file
 )
 
 file_context = ""
 if uploaded_files:
-    with st.expander(f"✅ Đã nhận {len(uploaded_files)} file", expanded=False):
+    with st.expander(f"✅ Đã nhận {len(uploaded_files)} file", expanded=True):
         for f in uploaded_files:
-            st.write(f"• {f.name}")
-            file_context += f"\n\n--- {f.name} ---\n{extract_file_content(f)[:1500]}"
+            st.write(f"**{f.name}** — {f.type or 'unknown'}")
+            file_context += f"\n\n--- {f.name} ---\n{extract_file_content(f)[:2000]}"
 
 # Lịch sử chat
 for msg in st.session_state.messages:
@@ -220,14 +237,14 @@ for msg in st.session_state.messages:
 # Chat input
 if prompt := st.chat_input("Nhập yêu cầu..."):
     if not api_key.strip():
-        st.error("⚠️ Chưa có OpenRouter API Key. Vào sidebar hoặc Secrets để thêm.")
+        st.error("⚠️ Chưa có OpenRouter API Key. Mở sidebar hoặc thêm vào Secrets.")
         st.stop()
 
     full_prompt = prompt + (f"\n\nFile đính kèm:{file_context}" if file_context else "")
 
     st.session_state.messages.append({
         "role": "user",
-        "content": prompt + (f"\n\n📎 {len(uploaded_files)} file" if uploaded_files else ""),
+        "content": prompt + (f"\n\n📎 {len(uploaded_files)} file đính kèm" if uploaded_files else ""),
         "avatar": "👤"
     })
     with st.chat_message("user", avatar="👤"):
@@ -268,10 +285,10 @@ if prompt := st.chat_input("Nhập yêu cầu..."):
             if key == "designer":
                 prompts = extract_prompts(result)
                 if prompts:
-                    st.markdown("**🖼️ Ảnh:**")
+                    st.markdown("**🖼️ Ảnh được tạo:**")
                     for p in prompts[:3]:
                         url = generate_image(p)
-                        st.image(url, caption=p[:100], use_container_width=True)
+                        st.image(url, caption=p[:120], use_container_width=True)
                         generated_images.append(url)
 
         st.session_state.messages.append({
@@ -292,7 +309,7 @@ if prompt := st.chat_input("Nhập yêu cầu..."):
             selected_model, api_key
         )
         ph.markdown('<span class="status-done">✅ Reviewer xong</span>', unsafe_allow_html=True)
-        st.markdown("### 🎯 Bản cuối")
+        st.markdown("### 🎯 Bản tổng hợp cuối")
         st.markdown(final)
     st.session_state.messages.append({"role": "assistant", "content": f"**✅ Reviewer**\n\n{final}", "avatar": "✅"})
 
